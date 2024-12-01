@@ -1,31 +1,52 @@
-import sys
-sys.path.append('d:/pythonProject/机器学习三/Customer-Analysis')
-from models.utils.feature_engineering import load_data
-import pandas as pd
-from sklearn.cluster import DBSCAN
-import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
+from collections import deque
 
-def main():
-    # 加载数据
-    data = load_data('d:/pythonProject/机器学习三/Customer-Analysis/data')
-    print(f"number of features extracted: {len(data.columns)}")
-    print(data.shape)
-    print(data.head(5))
-    
-    # # 进行基于密度的聚类分析（DBSCAN）
-    # # 选择一个合理的eps和min_samples值，通常需要调参
-    # dbscan = DBSCAN(eps=0.5, min_samples=5)  # 这里的参数需要根据数据进行调整
-    # data['cluster'] = dbscan.fit_predict(data)
+class DBSCAN:
+    def __init__(self, eps=0.3, min_samples=3):
+        self.eps = eps
+        self.min_samples = min_samples
+        self.labels_ = None
 
-    # # 聚类结果可视化
-    # plt.figure(figsize=(10, 6))
-    # sns.scatterplot(x=data.iloc[:, 0], y=data.iloc[:, 1], hue=data['cluster'], palette='viridis', marker='o', s=60, edgecolor='w', alpha=0.7)
-    # plt.title('DBSCAN Clustering Results')
-    # plt.xlabel('Feature 1')  # 如果你有多个特征，可以选择不同的特征进行可视化
-    # plt.ylabel('Feature 2')
-    # plt.legend(title='Cluster', loc='best')
-    # plt.show()
+    def fit(self, X):
+        # 样本数
+        n_samples = len(X)
+        # 用-1表示所有点未被访问
+        self.labels_ = np.full(n_samples, -1)
+        # 访问过的点
+        visited = np.zeros(n_samples, dtype=bool)
+        # cluster_id初始化为0
+        cluster_id = 0
+        
+        for i in range(n_samples):
+            if not visited[i]:
+                visited[i] = True
+                neighbors = self._region_query(X, i)
+                if len(neighbors) < self.min_samples:
+                    # 噪声点
+                    self.labels_[i] = -1
+                else:
+                    # 发现一个新簇
+                    self._expand_cluster(X, i, neighbors, cluster_id, visited)
+                    cluster_id += 1
 
-if __name__ == "__main__":
-    main()
+    def _region_query(self, X, point_idx):
+        """ 查找eps邻域内的点 """
+        neighbors = []
+        for i, point in enumerate(X):
+            if np.linalg.norm(X[point_idx] - point) < self.eps:
+                neighbors.append(i)
+        return neighbors
+
+    def _expand_cluster(self, X, point_idx, neighbors, cluster_id, visited):
+        """ 扩展簇 """
+        self.labels_[point_idx] = cluster_id
+        queue = deque(neighbors)
+        while queue:
+            current_point = queue.popleft()
+            if not visited[current_point]:
+                visited[current_point] = True
+                current_neighbors = self._region_query(X, current_point)
+                if len(current_neighbors) >= self.min_samples:
+                    queue.extend(current_neighbors)
+            if self.labels_[current_point] == -1:
+                self.labels_[current_point] = cluster_id
