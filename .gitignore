@@ -167,3 +167,6 @@ Requirement/
 Requirements/
 tmp/
 tmp.*
+*.ipynb
+thesis/
+Thesis/
